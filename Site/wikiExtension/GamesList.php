@@ -27,7 +27,7 @@ function getGameLetters($only_compatible) {
             $letters['#'] = 'name REGEXP \'^[0-9]\'';
         } else {
             $letter = strtoupper($row->letter);
-            $letters[$letter] = 'name like "'.$letter.'%"';
+            $letters[$letter] = 'games.name like "'.$letter.'%"';
         }
     }
     return $letters;

@@ -23,6 +23,7 @@ class SpecialGameCompatibility extends SpecialPage {
         
         $criteria_index = 'A';
         $true_index = 'A';
+        global $table;
         $table = 'current';
         $compatGroups = array();
         # Get request data from, e.g.
@@ -73,11 +74,11 @@ class SpecialGameCompatibility extends SpecialPage {
         $wgOut->addHTML('<h2>Introduction</h2>');
         
         $res = $dbr->select(array('games' => self::$database . '.games', //
-            'compat' => self::$database . '.' . $table . '_compatibility'), //
-                array('type', 'count(*) as count'), // $vars (columns of the table)
-                'games.name = compat.game', // $conds
+            'compat' => self::$database . '.' . $table . '_media_compatibility'), //
+                array('type', 'count(DISTINCT compat.name) as count'), // $vars (columns of the table)
+                'games.name = compat.name', // $conds
                 __METHOD__, // $fname = 'Database::select',
-                array('GROUP BY' => 'type')
+                array('GROUP BY' => 'games.type')
         );
         
         $counts = array();
@@ -119,18 +120,20 @@ class SpecialGameCompatibility extends SpecialPage {
                     null
             );
             $wgOut->addHTML('<p>This list reflects the game compatibility of the current data, which was released on ' . $res->fetchObject()->date . '.</p>');
-            $wgOut->addHTML('<p>According to this list '.$count_string.' are currently supported across various platforms.</p>');
+            $wgOut->addHTML('<p>According to this list '.$count_string);
+            if($count==1) {
+                $wgOut->addHTML(' is');
+            } else {
+                $wgOut->addHTML(' are');
+            }
+            $wgOut->addHTML(' currently supported across various platforms.</p>');
         } else {
             $wgOut->addHTML('<p>This list reflects the changes in game compatibility of the upcoming data release.</p>');
             $wgOut->addHTML('<p>According to this list '.$count_string.' will be added/updated with the next data update.</p>');
         }
 
         $wgOut->addHTML('<p>Unless implicitly stated only the US English install locations are supported. If you know the paths for other languages, please let me know.');
-        $wgOut->addHTML('<p>If your experience differs from what is presented here (including a Yes instead of an Untested), please e-mail me at sanmadjack@users.sourceforge.net. If a game that says Yes is not detected on your computer or if you have the path for a No, please send me the path to your save games, or at least the install path. We will figure it out.');
-
-
-        $wgOut->addHTML('<h2>Color Key</h2>');
-        $wgOut->addHTML('<table class="wikitable compatibility" cellpadding="5" cellspacing="0" border="1"><tr class="compatibility">');
+        $wgOut->addHTML('<p>If your experience differs from what is presented here, please e-mail me at sanmadjack@masgau.org. We will figure it out.');
 
         require_once('CompatabilityTable.php');
 
@@ -138,11 +141,6 @@ class SpecialGameCompatibility extends SpecialPage {
         // Loads up the game status values
         global $status_res;
         $status_res->seek(0);
-        foreach ($status_res as $status) {
-            $wgOut->addHTML('<td class="compatibility-' . $status->state . '">' . $status->title . ' - ' . $status->description . '</td>');
-        }
-
-        $wgOut->addHTML('</tr></table>');
 
         $wgOut->addHTML('<h2>Games</h2>');
         if ($table == "current") {
@@ -162,15 +160,15 @@ class SpecialGameCompatibility extends SpecialPage {
             $wgOut->addWikiText($links);
 
             $wgOut->addHTMl('</div>');
-            $selected_criteria = array(self::$criterias[$criteria_index],'games.name = compat.game');
+            $selected_criteria = array(self::$criterias[$criteria_index],'games.name = compat.name');
         }
         else {
-            $selected_criteria = array('games.name = compat.game');
+            $selected_criteria = array('games.name = compat.name');
         }
 
         $res = $dbr->select(array('games' => self::$database . '.games', //
-            'compat' => self::$database . '.' . $table . '_compatibility'), //
-                array('*'), // $vars (columns of the table)
+            'compat' => self::$database . '.' . $table . '_media_compatibility'), //
+                array('DISTINCT games.name','games.title'), // $vars (columns of the table)
                 $selected_criteria, // $conds
                 __METHOD__, // $fname = 'Database::select',
                 array('ORDER BY' => 'name ASC')
