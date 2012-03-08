@@ -73,22 +73,24 @@ class SpecialGameCompatibility extends SpecialPage {
 
         $wgOut->addHTML('<h2>Introduction</h2>');
 
+        $game_tables = array('games' => self::$database . '.games');
+        $game_criteria = array("games.type != 'system'");
+
         if ($table == "upcoming") {
-            $res = $dbr->select(array('games' => self::$database . '.games',
-                'compat' => self::$database . '.compatibility'), //
-                    array('type', 'count(DISTINCT games.name) as count'), // $vars (columns of the table)
-                    array("games.name = compat.name","games.type != 'system'","compat.state = 'upcoming'"), // $conds
-                    __METHOD__, // $fname = 'Database::select',
-                    array('GROUP BY' => 'games.type')
-            );
+            $game_tables['compat'] = self::$database . '.compatibility';
+            array_push($game_criteria, "compat.state = 'upcoming'");
+            array_push($game_criteria, "games.name = compat.name");
         } else {
-            $res = $dbr->select(array('games' => self::$database . '.games'), //
-                    array('type', 'count(DISTINCT games.name) as count'), // $vars (columns of the table)
-                    "games.type != 'system'", // $conds
-                    __METHOD__, // $fname = 'Database::select',
-                    array('GROUP BY' => 'games.type')
-            );
+            $game_tables['versions'] = self::$database . '.game_versions';
+            array_push($game_criteria, "versions.name = games.name");
         }
+
+        $res = $dbr->select($game_tables, //
+                array('type', 'count(DISTINCT games.name) as count'), // $vars (columns of the table)
+                $game_criteria, // $conds
+                __METHOD__, // $fname = 'Database::select',
+                array('GROUP BY' => 'games.type')
+        );
 
         $counts = array();
         $i = 0;
@@ -169,29 +171,15 @@ class SpecialGameCompatibility extends SpecialPage {
             $wgOut->addWikiText($links);
 
             $wgOut->addHTMl('</div>');
-            $selected_criteria = array(self::$criterias[$criteria_index]);
+            array_push($game_criteria, self::$criterias[$criteria_index]);
         }
-        else {
-            $selected_criteria = array();
-        }
-        if ($table == "upcoming") {
-            array_push($selected_criteria, "games.name = compat.name");
-            array_push($selected_criteria, "compat.state = 'upcoming'");
-        $res = $dbr->select(array('games' => self::$database . '.games',
-            'compat'=> self::$database . '.compatibility'), //
+        
+        $res = $dbr->select($game_tables, //
                 array('DISTINCT games.name', 'games.title'), // $vars (columns of the table)
-                $selected_criteria, // $conds
+                $game_criteria, // $conds
                 __METHOD__, // $fname = 'Database::select',
                 array('ORDER BY' => 'name ASC')
         );
-        } else {
-        $res = $dbr->select(array('games' => self::$database . '.games'), //
-                array('DISTINCT games.name', 'games.title'), // $vars (columns of the table)
-                $selected_criteria, // $conds
-                __METHOD__, // $fname = 'Database::select',
-                array('ORDER BY' => 'name ASC')
-        );
-        }
 
         //$wgOut->addHTML('<caption>'.$criteria_index.'</caption>');
 
