@@ -40,21 +40,23 @@ class SpecialGameData extends SpecialPage {
         $wgOut->addWikiText('<h2>MASGAU Compatibility</h2>');
         beginCompatTable();
         drawCompatHeader();
-        $res = $dbr->select('masgau_game_data.current_compatibility', array('*'), // $vars (columns of the table)
-                        'game = \''    . $game . '\'', // $conds
+        $res = $dbr->select('masgau_game_data.compatibility', array('*'), // $vars (columns of the table)
+                        array('name = \''    . $game . '\'',
+                            'state = \'current\''), // $conds
                         __METHOD__, // $fname = 'Database::select',
-                        array('ORDER BY' => 'game ASC')
+                        array('ORDER BY' => 'name ASC')
         );
         if ($res->numRows() > 0) {
-            drawCompatRow($res->fetchObject(), 'Current');
+            drawCompatRow($res->fetchObject(), 'Current','current');
         }
-        $res = $dbr->select('masgau_game_data.upcoming_compatibility', array('*'), // $vars (columns of the table)
-                        'game = \''    . $game . '\'', // $conds
+        $res = $dbr->select('masgau_game_data.compatibility', array('*'), // $vars (columns of the table)
+                        array('name = \''    . $game . '\'',
+                            'state = \'upcoming\''), // $conds
                         __METHOD__, // $fname = 'Database::select',
-                        array('ORDER BY' => 'game ASC')
+                        array('ORDER BY' => 'name ASC')
         );
         if ($res->numRows() > 0) {
-            drawCompatRow($res->fetchObject(), 'Upcoming');
+            drawCompatRow($res->fetchObject(), 'Upcoming','upcoming');
         }
         endCompatTable();
 

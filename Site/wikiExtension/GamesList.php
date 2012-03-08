@@ -1,17 +1,7 @@
 <?php
 
-function getGameLetters($only_compatible) {
+function getGameLetters() {
     $dbr = wfGetDB(DB_SLAVE);
-    if($only_compatible) {
-    $res = $dbr->select(array('games' => 'masgau_game_data.games',
-        'compat'=>'masgau_game_data.current_compatibility'), //
-            array('substr(name,1,1) as letter'), // $vars (columns of the table)
-            'games.name = compat.game', // $conds
-            __METHOD__, // $fname = 'Database::select',
-            array('GROUP BY' => 'letter',
-        'ORDER BY' => 'letter asc')
-    );
-    } else {
     $res = $dbr->select(array('games' => 'masgau_game_data.games'), //
             array('substr(name,1,1) as letter'), // $vars (columns of the table)
             null, // $conds
@@ -19,7 +9,6 @@ function getGameLetters($only_compatible) {
             array('GROUP BY' => 'letter',
         'ORDER BY' => 'letter asc')
     );
-    }
 
     $letters = array();
     foreach ($res as $row) {

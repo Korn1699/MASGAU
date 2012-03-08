@@ -20,7 +20,7 @@ class SpecialGameCompatibility extends SpecialPage {
 
         $par = $wgRequest->getText('title');
         $bits = explode('/', trim($par));
-        
+
         $criteria_index = 'A';
         $true_index = 'A';
         global $table;
@@ -33,22 +33,22 @@ class SpecialGameCompatibility extends SpecialPage {
         $compatGroups['ps'] = 1;
         $compatGroups['other'] = 1;
         $compatGroups['steam'] = 1;
-        foreach($bits as $bit) {
-            switch($bit) {
+        foreach ($bits as $bit) {
+            switch ($bit) {
                 case "current":
                 case "upcoming":
                     $table = $bit;
-                    $request_string .= $bit."/";
+                    $request_string .= $bit . "/";
                     break;
                 default:
-                    if(substr($bit,0,3)=="no_") {
-                        $compatGroups[substr($bit,3,strlen($bit)-3)] = 0;
-                        $request_string .= $bit."/";
+                    if (substr($bit, 0, 3) == "no_") {
+                        $compatGroups[substr($bit, 3, strlen($bit) - 3)] = 0;
+                        $request_string .= $bit . "/";
                     } else {
                         if (array_key_exists($bit, self::$criterias)) {
                             $criteria_index = $bit;
                             $true_index = $bit;
-                        } else if($bit=="NUMBERS") {
+                        } else if ($bit == "NUMBERS") {
                             $criteria_index = '#';
                             $true_index = $bit;
                         }
@@ -57,10 +57,10 @@ class SpecialGameCompatibility extends SpecialPage {
             }
         }
 
-        if($table=="upcoming") {
-                $wgOut->setPagetitle("Upcoming Game Compatibility");
+        if ($table == "upcoming") {
+            $wgOut->setPagetitle("Upcoming Game Compatibility");
         } else {
-                $wgOut->setPagetitle("Current Game Compatibility - " . $criteria_index);
+            $wgOut->setPagetitle("Current Game Compatibility - " . $criteria_index);
         }
 
         $wgOut->addHTML($param);
@@ -72,46 +72,55 @@ class SpecialGameCompatibility extends SpecialPage {
         $dbr = wfGetDB(DB_SLAVE);
 
         $wgOut->addHTML('<h2>Introduction</h2>');
-        
-        $res = $dbr->select(array('games' => self::$database . '.games', //
-            'compat' => self::$database . '.' . $table . '_media_compatibility'), //
-                array('type', 'count(DISTINCT compat.name) as count'), // $vars (columns of the table)
-                'games.name = compat.name', // $conds
-                __METHOD__, // $fname = 'Database::select',
-                array('GROUP BY' => 'games.type')
-        );
-        
+
+        if ($table == "upcoming") {
+            $res = $dbr->select(array('games' => self::$database . '.games',
+                'compat' => self::$database . '.compatibility'), //
+                    array('type', 'count(DISTINCT games.name) as count'), // $vars (columns of the table)
+                    array("games.name = compat.name","games.type != 'system'","compat.state = 'upcoming'"), // $conds
+                    __METHOD__, // $fname = 'Database::select',
+                    array('GROUP BY' => 'games.type')
+            );
+        } else {
+            $res = $dbr->select(array('games' => self::$database . '.games'), //
+                    array('type', 'count(DISTINCT games.name) as count'), // $vars (columns of the table)
+                    "games.type != 'system'", // $conds
+                    __METHOD__, // $fname = 'Database::select',
+                    array('GROUP BY' => 'games.type')
+            );
+        }
+
         $counts = array();
         $i = 0;
         $count = 0;
         $game_counts = array();
-        foreach($res as $row) {
+        foreach ($res as $row) {
             $counts[$row->type] = $row->count;
             $game_counts[$i] = $row->count;
-            if($row->count==1)
-                $game_counts[$i] .= ' '.$row->type;
-            else 
-                $game_counts[$i] .= ' '.$row->type.'s';
+            if ($row->count == 1)
+                $game_counts[$i] .= ' ' . $row->type;
+            else
+                $game_counts[$i] .= ' ' . $row->type . 's';
             $count += $row->count;
             $i++;
         }
         $count_string = '';
-        if($count>0) {
-            for($i = 0;$i<sizeof($game_counts);$i++) {
+        if ($count > 0) {
+            for ($i = 0; $i < sizeof($game_counts); $i++) {
                 $count_string .= $game_counts[$i];
-                if($i<sizeof($game_counts)-2) {
+                if ($i < sizeof($game_counts) - 2) {
                     $count_string .= ', ';
-                } else if($i<sizeof($game_counts)-1) {
+                } else if ($i < sizeof($game_counts) - 1) {
                     $count_string .= ' and ';
                 }
             }
-            if(sizeof($game_counts)>1) {
-                $count_string .= ' ('.$count.' total)';
+            if (sizeof($game_counts) > 1) {
+                $count_string .= ' (' . $count . ' total)';
             }
         } else {
             $count_string = "currently no games (for now)";
         }
-        
+
         if ($table == "current") {
             $res = $dbr->select(array('games' => 'masgau_game_data.xml_files'), //
                     'max(last_updated) as date', // $vars (columns of the table)
@@ -120,8 +129,8 @@ class SpecialGameCompatibility extends SpecialPage {
                     null
             );
             $wgOut->addHTML('<p>This list reflects the game compatibility of the current data, which was released on ' . $res->fetchObject()->date . '.</p>');
-            $wgOut->addHTML('<p>According to this list '.$count_string);
-            if($count==1) {
+            $wgOut->addHTML('<p>According to this list ' . $count_string);
+            if ($count == 1) {
                 $wgOut->addHTML(' is');
             } else {
                 $wgOut->addHTML(' are');
@@ -129,7 +138,7 @@ class SpecialGameCompatibility extends SpecialPage {
             $wgOut->addHTML(' currently supported across various platforms.</p>');
         } else {
             $wgOut->addHTML('<p>This list reflects the changes in game compatibility of the upcoming data release.</p>');
-            $wgOut->addHTML('<p>According to this list '.$count_string.' will be added/updated with the next data update.</p>');
+            $wgOut->addHTML('<p>According to this list ' . $count_string . ' will be added/updated with the next data update.</p>');
         }
 
         $wgOut->addHTML('<p>Unless implicitly stated only the US English install locations are supported. If you know the paths for other languages, please let me know.');
@@ -160,20 +169,29 @@ class SpecialGameCompatibility extends SpecialPage {
             $wgOut->addWikiText($links);
 
             $wgOut->addHTMl('</div>');
-            $selected_criteria = array(self::$criterias[$criteria_index],'games.name = compat.name');
+            $selected_criteria = array(self::$criterias[$criteria_index]);
         }
         else {
-            $selected_criteria = array('games.name = compat.name');
+            $selected_criteria = array();
         }
-
-        $res = $dbr->select(array('games' => self::$database . '.games', //
-            'compat' => self::$database . '.' . $table . '_media_compatibility'), //
-                array('DISTINCT games.name','games.title'), // $vars (columns of the table)
+        if ($table == "upcoming") {
+            array_push($selected_criteria, "games.name = compat.name");
+            array_push($selected_criteria, "compat.state = 'upcoming'");
+        $res = $dbr->select(array('games' => self::$database . '.games',
+            'compat'=> self::$database . '.compatibility'), //
+                array('DISTINCT games.name', 'games.title'), // $vars (columns of the table)
                 $selected_criteria, // $conds
                 __METHOD__, // $fname = 'Database::select',
                 array('ORDER BY' => 'name ASC')
         );
-
+        } else {
+        $res = $dbr->select(array('games' => self::$database . '.games'), //
+                array('DISTINCT games.name', 'games.title'), // $vars (columns of the table)
+                $selected_criteria, // $conds
+                __METHOD__, // $fname = 'Database::select',
+                array('ORDER BY' => 'name ASC')
+        );
+        }
 
         //$wgOut->addHTML('<caption>'.$criteria_index.'</caption>');
 
@@ -181,10 +199,10 @@ class SpecialGameCompatibility extends SpecialPage {
         if ($res->numRows() > 0) {
             require_once('CompatabilityTable.php');
             beginCompatTable();
-            drawCompatRows($res,$compatGroups);
+            drawCompatRows($res, $table);
             endCompatTable();
         } else {
-            if($letter==null) {
+            if ($letter == null) {
                 $wgOut->addHTML('<h3 style="width:100%;text-align:center;">There are currently no games in this list</h3>');
             } else {
                 $wgOut->addHTML('<h3 style="width:100%;text-align:center;">There are currently no supported games for the letter ' . $letter . '</h3>');

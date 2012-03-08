@@ -25,7 +25,7 @@ $medias = $dbr->select(array('compat' => 'masgau_game_data.compatibility_medias'
         array("ORDER BY" => "compat.order ASC")
 );
 
-function drawCompatRows($res) {
+function drawCompatRows($res,$state = 'current') {
     global $wgOut;
     $i = 0;
     $max_games = 50;
@@ -34,54 +34,119 @@ function drawCompatRows($res) {
             // Prints the table header every 50 or so, or when we're at a new letter
             drawCompatHeader();
         }
-        drawCompatRow($row);
+        drawCompatRow($row,null,$state);
         $i++;
         if ($i == 50)
             $i = 0;
     }
 }
 
-function drawCompatRow($game_res) {
-    global $wgOut, $table;
+function calcMediaNeutrality($game) {
+    $neutral_paths = array("userdocuments");
+//    $versions = $dbr->select(array('compat' => 'masgau_game_data.game_versions'), array('*'), // $vars (columns of the table)
+//            array('compat.name=\'' . $game_res->name . '\'',
+//        'compat.platform not in (\'PS1\',\'PS2\',\'PS3\',\'PSP\',\'PSVITA\')'), // $conds
+//            __METHOD__, // $fname = 'Database::select',
+//            array("ORDER BY" => "compat.platform",
+//        "ORDER BY" => "compat.region");
+//    foreach($game as $row) {
+//        $paths = $dbr->select(array('compat' => 'masgau_game_data.game_versions'), array('*'), // $vars (columns of the table)
+//                array('compat.name=\'' . $game_res->name . '\'',
+//            'compat.platform not in (\'PS1\',\'PS2\',\'PS3\',\'PSP\',\'PSVITA\')'), // $conds
+//                __METHOD__, // $fname = 'Database::select',
+//                array("ORDER BY" => "compat.platform",
+//            "ORDER BY" => "compat.region")
+//        );
+//    }
+}
+
+function drawCompatRow($game_res, $name_overide = null, $state = 'current') {
+    global $wgOut;
     global $platforms;
     global $medias;
     $dbr = wfGetDB(DB_SLAVE);
     $wgOut->addHTML('<tr class="compatibility">');
     $wgOut->addHTML('<th>');
-    $wgOut->addWikiText('[[Special:GameData/' . $game_res->name . '|' . $game_res->title . ']]');
-    $wgOut->addHTML('</th>');
+    if($name_overide==null) {
+        $wgOut->addWikiText('[[Special:GameData/' . $game_res->name . '|' . $game_res->title . ']]');
+        
+    } else {
+        $wgOut->addWikiText($name_overide);
+    }
+        $wgOut->addHTML('</th>');
     $platforms->seek(0);
     foreach ($platforms as $platform) {
-        $res = $dbr->select(array('compat' => 'masgau_game_data.' . $table . '_media_compatibility'), array('*'), // $vars (columns of the table)
-                array('compat.name=\'' . $game_res->name . '\'', 'compat.platform=\'' . $platform->name . '\''), // $conds
+        $res = $dbr->select(array('compat' => 'masgau_game_data.compatibility'), array('*'), // $vars (columns of the table)
+                array('compat.state=\''.$state.'\'','compat.name=\'' . $game_res->name . '\'', 'compat.platform=\'' . $platform->name . '\''), // $conds
                 __METHOD__, // $fname = 'Database::select',
                 null
         );
         $row = $res->fetchRow();
         if ($row == false) {
-            $wgOut->addHTML('<td class="empty">');
+            $wgOut->addHTML('<td class="empty ' . $platform->name . '_column">');
         } else {
-            $wgOut->addHTML('<td class="medias">');
+            $wgOut->addHTML('<td class="medias ' . $platform->name . '_column">');
             $medias->seek(0);
+            $string = "";
+
+           if(calcMediaNeutrality($versions)) {
+                        $string .='[[File:media_neutral.png|link=|alt=Media Neutral|top]]';
+                
+            }
             foreach ($medias as $media) {
                 if ($row[$media->name] == true) {
-                    $wgOut->addWikiText(' [[File:' . $media->icon . '|link=|alt=' . $media->title . '|top|frameless]]');
+                    if ($platform->name == "dos" && $media->name == "disc") {
+                        $string .='[[File:floppy.png|link=|alt=Disk|top]]';
+                    } else {
+
+                        $string .= '[[File:' . $media->icon . '|link=' . $media->url . '|alt=' . $media->title . '|top]]';
+                    }
                 }
             }
+            
+            $wgOut->addWikiText($string);
         }
         $wgOut->addHTML('</td>');
     }
+    $res = $dbr->select(array('compat' => 'masgau_game_data.game_versions'), array('*'), // $vars (columns of the table)
+            array('compat.name=\'' . $game_res->name . '\'',
+        'compat.platform in (\'PS1\',\'PS2\',\'PS3\',\'PSP\',\'PSVITA\')'), // $conds
+            __METHOD__, // $fname = 'Database::select',
+            array("ORDER BY" => "compat.platform",
+        "ORDER BY" => "compat.region")
+    );
+    $row = $res->fetchRow();
+    if ($row == false) {
+        $wgOut->addHTML('<td class="empty">');
+    } else {
+        $res->seek(0);
+        $wgOut->addHTML('<td>');
+        $playstations = array();
+        foreach ($res as $row) {
+            if (!array_key_exists($row->platform, $playstations)) {
+                $playstations[$row->platform] = "";
+            }
+            $playstations[$row->platform] .= $row->region . " ";
+        }
+        foreach ($playstations as $key => $value) {
+            $wgOut->addWikiText($key . " (" . trim($value) . ")");
+        }
+    }
+
+    $wgOut->addHTML('</td>');
 
     $wgOut->addHTML('<td>');
     $res = $dbr->select(array('compat' => 'masgau_game_data.game_versions'), array('*'), // $vars (columns of the table)
-            array('compat.name=\'' . $game_res->name . '\''), // $conds
+            array('compat.name=\'' . $game_res->name . '\'',
+                'compat.comment != "" OR compat.restore_comment != ""'), // $conds
             __METHOD__, // $fname = 'Database::select',
             null
     );
-
-    if ($res == false) {
+    
+    if ($res->fetchRow() == false) {
         $wgOut->addWikiText('None');
     } else {
+        $res->seek(0);
         foreach ($res as $row) {
             if ($row->comment != null) {
                 $wgOut->addWikiText($row->comment);
@@ -112,12 +177,13 @@ function drawCompatHeader() {
     global $platforms;
     global $medias;
     $wgOut->addHTML('<tr class="compatibility_header">');
-    $wgOut->addHTML('<th></th>');
+    $wgOut->addHTML('<th style="width:20%"></th>');
     $platforms->seek(0);
     foreach ($platforms as $platform) {
-        $wgOut->addHTML('<th>' . $platform->title . '</th>');
+        $wgOut->addHTML('<th style="width:' . $platform->width . '">' . $platform->title . '</th>');
     }
-    $wgOut->addHTML('<th>Comments</th>');
+    $wgOut->addHTML('<th style="width:100px">PlayStation</th>');
+    $wgOut->addHTML('<th style="width:20%">Comments</th>');
     $wgOut->addHTML('</tr>');
 }
 

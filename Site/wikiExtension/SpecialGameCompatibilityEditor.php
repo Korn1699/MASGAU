@@ -4,6 +4,8 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
 
     private static $game_types = array("game", "mod", "expansion", "system");
 
+    private static $ignore_fields = array("name" , "platform" , "state");
+    
     function __construct() {
         parent::__construct('GameCompatibilityEditor');
     }
@@ -52,17 +54,17 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
 
         $dbr = wfGetDB(DB_SLAVE);
 
-        $res = $dbr->select(array('games' => 'masgau_game_data.current_compatibility'
+        $res = $dbr->select(array('games' => 'masgau_game_data.compatibility'
                 ), //
                 '*', // $vars (columns of the table)
-                'game = \'DeusEx\'', // $conds
+                'name = \'DeusEx\'', // $conds
                 __METHOD__, // $fname = 'Database::select',
                 null
         );
         $row = $res->fetchRow();
         $i = 0;
         foreach (array_keys($row) as $key) {
-            if (is_numeric($key) || $key == "game" || $key == "comment")
+            if (is_numeric($key) || in_array($key, self::$ignore_fields))
                 continue;
             $this->fields[$i] = $key;
             $i++;
@@ -93,23 +95,23 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
     private function doMerge() {
         global $wgOut;
         $dbr = wfGetDB(DB_MASTER);
-        $res = $dbr->select(array('games' => 'masgau_game_data.upcoming_compatibility'
+        $res = $dbr->select(array('games' => 'masgau_game_data.compatibility'
                 ), //
                 '*', // $vars (columns of the table)
-                null, // $conds
+                'games.state = \'upcoming\'', // $conds
                 __METHOD__, // $fname = 'Database::select',
                 null
         );
         $row = $res->fetchRow();
         while ($row != null) {
-            $check = $dbr->select(array('games' => 'masgau_game_data.current_compatibility'
+            $check = $dbr->select(array('games' => 'masgau_game_data.compatibility'
                     ), //
                     '*', // $vars (columns of the table)
-                    'game = \''.$row['game'].'\'', // $conds
+                    array('name = \''.$row['name'].'\'','state=\'current\'','platform=\''.$row['platform'].'\''), // $conds
                     __METHOD__, // $fname = 'Database::select',
                     null
             );
-            $wgOut->addWikiText('Merging '.$row['game']);
+            $wgOut->addWikiText('Merging '.$row['name'].' '.$row['platform']);
             
             $params = array();
             foreach ($this->fields as $field) {
@@ -118,19 +120,18 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
                 }
                 $params[$field] = $row[$field];
             }
-            $params['comment'] = $row['comment'];
             
-            if($check->numRows() == 0) {
-                $params['game'] = $row['game'];
-                $dbr->insert('masgau_game_data.current_compatibility', $params
-                        , __METHOD__, null);
-            } else {
-                $dbr->update('masgau_game_data.current_compatibility', $params, array('game = \'' . $row['game'] . '\''), $fname = 'DatabaseBase::update', null);                
+            if($check->numRows() > 0) {
+                $dbr->delete('masgau_game_data.compatibility',
+                        array('name = \'' . $row['name'] . '\'','state=\'current\'','platform=\''.$row['platform'].'\''),
+                        $fname = 'DatabaseBase::delete'	);
             }
             
-            $dbr->delete('masgau_game_data.upcoming_compatibility',
-                    array('game = \'' . $row['game'] . '\''),
-                    $fname = 'DatabaseBase::delete'	);
+            $dbr->update('masgau_game_data.compatibility', 
+                    array("state" => "current"),
+                    array('name = \'' . $row['name'] . '\'','state=\'upcoming\'','platform=\''.$row['platform'].'\''),
+                    $fname = 'DatabaseBase::update', null);                
+            
             
             $row = $res->fetchRow();
         }
@@ -181,26 +182,31 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
 
             $name = $edit_name;
         }
-
+        $platform = $wgRequest->getText('platform');
         $update = $wgRequest->getText('update');
         $create = $wgRequest->getText('create');
         if ($update != null || $create != null) {
             $params = array();
             foreach ($this->fields as $field) {
                 if ($wgRequest->getText($field) == null) {
-                    throw new Exception("ETF?");
+                    $params[$field] = false;
+                } else {
+                    $params[$field] = true;
                 }
-                $params[$field] = $wgRequest->getText($field);
-            }
-            $params["comment"] = $wgRequest->getText('comment');
+                }
             $dbr = wfGetDB(DB_MASTER);
 
             if ($update != null) {
-                $dbr->update('masgau_game_data.' . $update . '_compatibility', $params, array('game = \'' . $name . '\''), $fname = 'DatabaseBase::update', null);
+                $dbr->update('masgau_game_data.compatibility', $params, 
+                        array('name = \'' . $name . '\'',
+                            'state = \''.$update.'\'',
+                            'platform = \''.$platform.'\''), $fname = 'DatabaseBase::update', null);
             }
             if ($create != null) {
-                $params['game'] = $name;
-                $dbr->insert('masgau_game_data.' . $create . '_compatibility', $params
+                $params['name'] = $name;
+                $params['state'] = $create;
+                $params['platform'] = $platform;
+                $dbr->insert('masgau_game_data.compatibility', $params
                         , __METHOD__, null);
             }
         }
@@ -238,25 +244,27 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
                 Xml::closeElement('form') .
                 Xml::closeElement('fieldset')
         );
-        $this->drawCompatEditor($name, "current");
-        $this->drawCompatEditor($name, "upcoming");
-    }
 
-    private function drawCompatEditor($name, $mode) {
-        global $wgOut;
-        $dbr = wfGetDB(DB_SLAVE);
-        $states = $dbr->select(array('games' => 'masgau_game_data.compatibility_states'
-                ), //
-                '*', // $vars (columns of the table)
-                null, // $conds
-                __METHOD__, // $fname = 'Database::select',
-                null
+        $platforms = $dbr->select(array('compat' => 'masgau_game_data.compatibility_platforms'), array('*'), // $vars (columns of the table)
+       null, // $conds
+        __METHOD__, // $fname = 'Database::select',
+        array("ORDER BY" => "compat.order ASC")
         );
 
-        $res = $dbr->select(array('games' => 'masgau_game_data.' . $mode . '_compatibility'
+        foreach($platforms as $platform) {
+            $this->drawCompatEditor($name, "current", $platform->name);
+            $this->drawCompatEditor($name, "upcoming", $platform->name);
+        }
+    }
+
+    private function drawCompatEditor($name, $mode,$platform) {
+        global $wgOut;
+        $dbr = wfGetDB(DB_SLAVE);
+
+        $res = $dbr->select(array('games' => 'masgau_game_data.compatibility'
                 ), //
                 '*', // $vars (columns of the table)
-                'game = \'' . $name . '\'', // $conds
+                array('name = \'' . $name . '\'','state = \''.$mode.'\'','platform = \''.$platform.'\''), // $conds
                 __METHOD__, // $fname = 'Database::select',
                 null
         );
@@ -264,10 +272,10 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
         $creating = false;
         if ($res->numRows() == 0) {
             $creating = true;
-            $res = $dbr->select(array('games' => 'masgau_game_data.current_compatibility'
+            $res = $dbr->select(array('games' => 'masgau_game_data.compatibility'
                     ), //
                     '*', // $vars (columns of the table)
-                    'game = \'' . $name . '\'', // $conds
+                    array('name = \'' . $name . '\'','state = \''.$mode.'\'','platform = \''.$platform.'\''), // $conds
                     __METHOD__, // $fname = 'Database::select',
                     null
             );
@@ -287,7 +295,8 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
                     'id' => 'mw-import-upload-form')) .
                 Html::hidden('action', 'update'));
 
-        $wgOut->addHTML('<input type="hidden" name="name" value="' . $game->name . '"/>');
+        $wgOut->addHTML('<input type="hidden" name="name" value="' . $name . '"/>');
+        $wgOut->addHTML('<input type="hidden" name="platform" value="' . $platform . '"/>');
         if ($creating) {
             $wgOut->addHTML('<input type="hidden" name="create" value="' . $mode . '"/>');
         } else {
@@ -295,29 +304,24 @@ class SpecialGameCompatibilityEditor extends SpecialPage {
         }
         $wgOut->addHTML("<table><tr>");
         foreach (array_keys($row) as $key) {
-            if (is_numeric($key) || $key == "game")
+            if (is_numeric($key) ||  in_array($key, self::$ignore_fields))
                 continue;
             $wgOut->addHTML("<th>$key</th>");
         }
         $wgOut->addHTML("</tr><tr>");
         $i = 1;
         foreach (array_keys($row) as $key) {
-            if (is_numeric($key) || $key == "game" || $key == "comment")
+            if (is_numeric($key) || in_array($key, self::$ignore_fields))
                 continue;
             $i++;
-            $wgOut->addHTML('<td><select name="' . $key . '">');
-            foreach ($states as $state) {
-                if ($state->state == $row[$key]) {
-                    $wgOut->addHTML("<option selected=\"true\" value=\"" . $state->state . "\">" . $state->title . "</option>");
-                } else {
-                    $wgOut->addHTML("<option value=\"" . $state->state . "\">" . $state->title . "</option>");
-                }
+            $wgOut->addHTML('<td><input type="checkbox" name="' . $key . '" value="true" ');
+            if($row[$key]==true) {
+                $wgOut->addHTML('checked="true" ');
             }
-            $wgOut->addHTML("</select></td>");
+            $wgOut->addHTML("/></td>");
         }
-        $wgOut->addHTML('<td><input name="comment" value="' . $row['comment'] . '" /></td>');
         $wgOut->addHTML("</tr><tr><td colspan=\"" . $i . "\">");
-        $wgOut->addHTML('<input type="submit" value="update ' . $mode . ' compatability" style="width:100%;" />');
+        $wgOut->addHTML('<input type="submit" value="update ' . $mode . ' '.$platform.' compatability" style="width:100%;" />');
         $wgOut->addHTML(
                 Xml::closeElement('form') .
                 Xml::closeElement('fieldset')
