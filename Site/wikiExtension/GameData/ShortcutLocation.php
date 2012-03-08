@@ -5,7 +5,7 @@ class ShortcutLocation extends Location {
     //put your code here
     
     public $ev;
-    public $shortcut;
+    public $path;
     
     public function loadFromDb($id) {
         $sql = 'select * from masgau_game_data.game_shortcuts where id = '.$id.'';
@@ -13,7 +13,10 @@ class ShortcutLocation extends Location {
         
         if($row = mysql_fetch_assoc($result)) {
             $this->ev = $row['ev'];
-            $this->shortcut = $row['shortcut'];
+            if($this->ev==null) {
+                $this->ev = "startmenu";
+            }
+            $this->path = $row['path'];
         }        
         parent::loadFromDb($id);
     }
@@ -31,8 +34,8 @@ class ShortcutLocation extends Location {
                 case 'environment_variable':
                     $this->ev = $attribute->value;
                     break;
-                case 'shortcut':
-                    $this->shortcut = $attribute->value;
+                case 'path':
+                    $this->path = $attribute->value;
                     break;
                 default:
                     throw new Exception($attribute->name.' not supported');
@@ -40,16 +43,16 @@ class ShortcutLocation extends Location {
         }
         
         $wgOut->addHTML('<tr><td>');
-        $wgOut->addHTML($this->ev.'|'.$this->shortcut.'|');
+        $wgOut->addHTML($this->ev.'|'.$this->path.'|');
         parent::loadFromXml($node);
         $wgOut->addHTML('</td></tr>');
     }
 
     public function writeToDb($id) {
         global $wgOut;
-        $wgOut->addWikiText('*** Writing shortcut ' . $this->ev. '\\'.$this->shortcut.' to database');
+        $wgOut->addWikiText('*** Writing shortcut ' . $this->ev. '\\'.$this->path.' to database');
 
-        $insert = array('ev'=>$this->ev,'shortcut'=>$this->shortcut);
+        $insert = array('ev'=>$this->ev,'path'=>$this->path);
         
         $this->writeAllToDb($id,'masgau_game_data.game_shortcuts', $insert);
 

@@ -58,8 +58,8 @@ class Exporter extends MASGAUBase {
                     $tag = $new_game->appendChild($this->createElement("location_shortcut"));
                     $tag->appendChild($this->xml->createAttribute("environment_variable"))->
                             appendChild($this->createTextNode($location->ev));
-                    $tag->appendChild($this->xml->createAttribute("shortcut"))->
-                            appendChild($this->createTextNode($location->shortcut));
+                    $tag->appendChild($this->xml->createAttribute("path"))->
+                            appendChild($this->createTextNode($location->path));
                     break;
                 case "GameLocation":
                     $tag = $new_game->appendChild($this->createElement("location_game"));
