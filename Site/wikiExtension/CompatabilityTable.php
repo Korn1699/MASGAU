@@ -68,8 +68,22 @@ function drawCompatRow($game_res, $name_overide = null, $state = 'current') {
     $wgOut->addHTML('<tr class="compatibility">');
     $wgOut->addHTML('<th>');
     if($name_overide==null) {
-        $wgOut->addWikiText('[[Special:GameData/' . $game_res->name . '|' . $game_res->title . ']]');
-        
+        $string = '[[Special:GameData/' . $game_res->name . '|' . $game_res->title . ']]';
+
+        if($state=='upcoming') {
+            $res = $dbr->select(array('compat' => 'masgau_game_data.game_versions'), array('*'), // $vars (columns of the table)
+                    array('compat.name=\'' . $game_res->name . '\''), // $conds
+                    __METHOD__, // $fname = 'Database::select',
+                    null
+            );
+            if($res->numRows()==0) {
+                $string .= ' (New!)';
+            } else {
+                $string .= ' (Updated!)';
+            }
+        }
+        $wgOut->addWikiText($string);
+
     } else {
         $wgOut->addWikiText($name_overide);
     }
