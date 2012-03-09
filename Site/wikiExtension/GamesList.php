@@ -13,7 +13,7 @@ function getGameLetters() {
     $letters = array();
     foreach ($res as $row) {
         if(is_numeric($row->letter)) {
-            $letters['#'] = 'name REGEXP \'^[0-9]\'';
+            $letters['#'] = 'games.name REGEXP \'^[0-9]\'';
         } else {
             $letter = strtoupper($row->letter);
             $letters[$letter] = 'games.name like "'.$letter.'%"';
